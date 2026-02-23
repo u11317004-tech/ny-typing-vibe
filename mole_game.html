@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>瘋狂打地鼠：森林大冒險</title>
+    <style>
+        /* --- 視覺設計與排版 --- */
+        :root {
+            --grass: #55a630;
+            --dirt: #6d4c41;
+            --wood: #a0522d;
+            --font-main: 'Segoe UI', Microsoft JhengHei, sans-serif;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background: #87ceeb; /* 天藍色 */
+            font-family: var(--font-main);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            overflow: hidden;
+            cursor: url('https://cur.cursors-4u.net/games/gam-4/gam372.cur'), auto; /* 嘗試自定義槌子游標 */
+        }
+
+        /* 標題與計分板 */
+        .header {
+            text-align: center;
+            padding: 20px;
+            color: #fff;
+            text-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+        }
+
+        .score-board {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px 40px;
+            border-radius: 50px;
+            display: flex;
+            gap: 40px;
+            font-size: 24px;
+            font-weight: 900;
+            color: var(--wood);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            border: 4px solid var(--wood);
+        }
+
+        /* 遊戲草地區域 */
+        .game-area {
+            margin-top: 30px;
+            width: 600px;
+            height: 400px;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(2, 1fr);
+            gap: 20px;
+            background: var(--grass);
+            padding: 40px;
+            border-radius: 40px;
+            border-bottom: 15px solid #2d6a4f;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+        }
+
+        /* 地洞設計 */
+        .hole {
+            background: #3e2723;
+            border-radius: 50% / 30%;
+            position: relative;
+            overflow: hidden; /* 關鍵：隱藏地鼠 */
+            box-shadow: inset 0 10px 20px #000;
+        }
+
+        /* 地鼠設計 */
+        .mole {
+            width: 100%;
+            height: 100%;
+            background: #8d6e63;
+            position: absolute;
+            bottom: -100%; /* 預設在洞底 */
+            border-radius: 50% 50% 10% 10%;
+            transition: bottom 0.1s cubic-bezier(0.17, 0.67, 0.83, 0.67);
+            cursor: pointer;
+        }
+
+        .mole::before, .mole::after { /* 眼睛 */
+            content: '';
+            position: absolute;
+            background: #000;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            top: 25%;
+        }
+        .mole::before { left: 25%; }
+        .mole::after { right: 25%; }
+
+        .mole-nose {
+            position: absolute;
+            width: 16px;
+            height: 10px;
+            background: #ff7043;
+            border-radius: 50%;
+            top: 45%;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .mole.up { bottom: 0; }
+
+        /* 擊中動畫 */
+        .mole.hit {
+            background: #d32f2f !important;
+            transform: scale(0.9);
+        }
+
+        /* 遊戲開始/結束 覆蓋層 */
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            color: white;
+            text-align: center;
+        }
+
+        .modal {
+            background: white;
+            color: #333;
+            padding: 40px;
+            border-radius: 20px;
+            max-width: 400px;
+            box-shadow: 0 0 30px #f1c40f;
+        }
+
+        .modal h2 { color: var(--wood); margin-top: 0; }
+        .modal ul { text-align: left; line-height: 1.6; }
+
+        .start-btn {
+            background: #e67e22;
+            color: white;
+            padding: 15px 40px;
+            font-size: 20px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.2s;
+            margin-top: 20px;
+        }
+
+        .start-btn:hover { background: #d35400; transform: scale(1.05); }
+
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+
+    <div id="gameOverlay" class="overlay">
+        <div class="modal">
+            <h2 id="modalTitle">🪵 森林打地鼠 🪵</h2>
+            <div id="rules">
+                <p><strong>遊玩規則：</strong></p>
+                <ul>
+                    <li>點擊「開始遊戲」後有 30 秒挑戰時間。</li>
+                    <li>地鼠會從地洞中隨機冒出。</li>
+                    <li>用你的滑鼠（槌子）點擊地鼠。</li>
+                    <li>每打中一隻得 1 分，漏掉不扣分。</li>
+                </ul>
+            </div>
+            <p id="finalScore" class="hidden"></p>
+            <button class="start-btn" onclick="initGame()">開始挑戰</button>
+        </div>
+    </div>
+
+    <div class="header">
+        <h1>🔨 WHACK-A-MOLE 🔨</h1>
+        <div class="score-board">
+            <div>得分：<span id="scoreText">0</span></div>
+            <div>剩餘：<span id="timerText">30</span>s</div>
+        </div>
+    </div>
+
+    <div class="game-area">
+        <div class="hole"><div class="mole" onclick="handleWhack(this)"><div class="mole-nose"></div></div></div>
+        <div class="hole"><div class="mole" onclick="handleWhack(this)"><div class="mole-nose"></div></div></div>
+        <div class="hole"><div class="mole" onclick="handleWhack(this)"><div class="mole-nose"></div></div></div>
+        <div class="hole"><div class="mole" onclick="handleWhack(this)"><div class="mole-nose"></div></div></div>
+        <div class="hole"><div class="mole" onclick="handleWhack(this)"><div class="mole-nose"></div></div></div>
+        <div class="hole"><div class="mole" onclick="handleWhack(this)"><div class="mole-nose"></div></div></div>
+    </div>
+
+    <script>
+        const moles = document.querySelectorAll('.mole');
+        const scoreText = document.getElementById('scoreText');
+        const timerText = document.getElementById('timerText');
+        const overlay = document.getElementById('gameOverlay');
+        const modalTitle = document.getElementById('modalTitle');
+        const finalScoreDisplay = document.getElementById('finalScore');
+        const rulesDisplay = document.getElementById('rules');
+
+        let score = 0;
+        let timeLeft = 30;
+        let isGameActive = false;
+        let lastHoleIndex = -1;
+
+        // 初始化/重置遊戲
+        function initGame() {
+            score = 0;
+            timeLeft = 30;
+            isGameActive = true;
+            scoreText.innerText = score;
+            timerText.innerText = timeLeft;
+            
+            overlay.classList.add('hidden'); // 隱藏遮罩
+            
+            startGameTimer();
+            showRandomMole();
+        }
+
+        // 時間倒數邏輯
+        function startGameTimer() {
+            const countdown = setInterval(() => {
+                timeLeft--;
+                timerText.innerText = timeLeft;
+
+                if (timeLeft <= 0) {
+                    clearInterval(countdown);
+                    endGame();
+                }
+            }, 1000);
+        }
+
+        // 地鼠冒出邏輯
+        function showRandomMole() {
+            if (!isGameActive) return;
+
+            // 隨機選擇地洞（不重複上一次）
+            let index;
+            do {
+                index = Math.floor(Math.random() * moles.length);
+            } while (index === lastHoleIndex);
+            
+            lastHoleIndex = index;
+            const mole = moles[index];
+
+            mole.classList.add('up');
+
+            // 根據得分增加難度（地鼠停留時間縮短）
+            const stayDuration = Math.max(500, 1200 - (score * 20));
+
+            setTimeout(() => {
+                mole.classList.remove('up');
+                mole.classList.remove('hit');
+                if (isGameActive) showRandomMole();
+            }, stayDuration);
+        }
+
+        // 點擊打地鼠
+        function handleWhack(moleElement) {
+            if (!isGameActive || !moleElement.classList.contains('up')) return;
+
+            score++;
+            scoreText.innerText = score;
+            
+            moleElement.classList.add('hit');
+            moleElement.classList.remove('up');
+
+            // 可以在此加入震動或音效
+            if (navigator.vibrate) navigator.vibrate(50); 
+        }
+
+        // 結束遊戲
+        function endGame() {
+            isGameActive = false;
+            overlay.classList.remove('hidden');
+            modalTitle.innerText = "💥 時間到！";
+            rulesDisplay.classList.add('hidden');
+            finalScoreDisplay.classList.remove('hidden');
+            finalScoreDisplay.innerHTML = `<h3>你的最終得分是：<span style="color: #e67e22; font-size: 40px;">${score}</span></h3>`;
+            document.querySelector('.start-btn').innerText = "再玩一次";
+        }
+    </script>
+</body>
+</html>
