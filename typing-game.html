@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NeonType | 極簡英文打字挑戰</title>
+    <style>
+        /* CSS 樣式表 */
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --accent-color: #334155;
+            --neon-green: #2dd4bf;
+            --error-red: #fb7185;
+            --text-gray: #94a3b8;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: #f8fafc;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        .game-container {
+            background: var(--card-bg);
+            padding: 2.5rem;
+            border-radius: 24px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            width: 90%;
+            max-width: 750px;
+            text-align: center;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        h1 { 
+            margin: 0; 
+            font-size: 1.8rem;
+            background: linear-gradient(to right, #2dd4bf, #22d3ee);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: 800;
+        }
+
+        .stats { display: flex; gap: 25px; }
+        .stat-box { display: flex; flex-direction: column; align-items: center; }
+        .stat-label { font-size: 0.75rem; color: var(--text-gray); text-transform: uppercase; margin-bottom: 4px; }
+        .stat-value { font-size: 1.4rem; font-weight: 700; color: var(--neon-green); }
+
+        .display-area {
+            position: relative;
+            background: rgba(15, 23, 42, 0.5);
+            padding: 25px;
+            border-radius: 16px;
+            margin-bottom: 20px;
+            min-height: 120px;
+            text-align: left;
+        }
+
+        .quote-display {
+            font-size: 1.6rem;
+            line-height: 1.5;
+            letter-spacing: 0.05em;
+            word-break: break-word;
+            color: #475569; /* 未輸入字的顏色 */
+        }
+
+        /* 狀態顏色 */
+        .correct { color: #f8fafc; }
+        .incorrect { color: var(--error-red); background: rgba(251, 113, 133, 0.2); border-radius: 4px; }
+        .current { border-bottom: 3px solid var(--neon-green); }
+
+        .quote-input {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            opacity: 0;
+            cursor: default;
+        }
+
+        .hint { color: var(--text-gray); font-size: 0.9rem; margin-top: 15px; }
+
+        button {
+            margin-top: 25px;
+            background: transparent;
+            border: 2px solid var(--accent-color);
+            color: white;
+            padding: 10px 25px;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 600;
+        }
+
+        button:hover {
+            background: var(--accent-color);
+            border-color: var(--neon-green);
+            color: var(--neon-green);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="game-container">
+        <header>
+            <h1>NeonType</h1>
+            <div class="stats">
+                <div class="stat-box">
+                    <span class="stat-label">Time</span>
+                    <span id="timer" class="stat-value">60</span>
+                </div>
+                <div class="stat-box">
+                    <span class="stat-label">WPM</span>
+                    <span id="wpm" class="stat-value">0</span>
+                </div>
+                <div class="stat-box">
+                    <span class="stat-label">Acc %</span>
+                    <span id="accuracy" class="stat-value">100</span>
+                </div>
+            </div>
+        </header>
+
+        <div class="display-area" onclick="document.getElementById('quote-input').focus()">
+            <div id="quote-display" class="quote-display"></div>
+            <textarea id="quote-input" class="quote-input" autofocus spellcheck="false"></textarea>
+        </div>
+
+        <p class="hint">點擊上方區域並直接開始輸入...</p>
+        <button id="restart-btn">重新開始遊戲</button>
+    </div>
+
+    <script>
+        // JavaScript 邏輯
+        const RANDOM_QUOTES = [
+            "Technology is best when it brings people together.",
+            "Design is not just what it looks like and feels like.",
+            "Success is a journey, not a destination.",
+            "Stay hungry, stay foolish, and keep pushing forward.",
+            "Coding is the language of the future, start learning today.",
+            "Simplicity is the ultimate sophistication.",
+            "Life is what happens when you're busy making other plans."
+        ];
+
+        const quoteDisplay = document.getElementById('quote-display');
+        const quoteInput = document.getElementById('quote-input');
+        const timerTag = document.getElementById('timer');
+        const wpmTag = document.getElementById('wpm');
+        const accTag = document.getElementById('accuracy');
+        const restartBtn = document.getElementById('restart-btn');
+
+        let timer, maxTime = 60, timeLeft = maxTime;
+        let charIndex = 0, mistakes = 0, isTyping = false;
+
+        function loadQuote() {
+            const ranIndex = Math.floor(Math.random() * RANDOM_QUOTES.length);
+            quoteDisplay.innerHTML = "";
+            RANDOM_QUOTES[ranIndex].split("").forEach(char => {
+                let span = `<span>${char}</span>`;
+                quoteDisplay.innerHTML += span;
+            });
+            quoteDisplay.querySelectorAll("span")[0].classList.add("current");
+            
+            // 重設輸入
+            document.addEventListener("keydown", () => quoteInput.focus());
+            quoteDisplay.onclick = () => quoteInput.focus();
+        }
+
+        function initTyping() {
+            let characters = quoteDisplay.querySelectorAll("span");
+            let typedChar = quoteInput.value.split("")[charIndex];
+
+            if (charIndex < characters.length && timeLeft > 0) {
+                if (!isTyping) {
+                    timer = setInterval(initTimer, 1000);
+                    isTyping = true;
+                }
+
+                if (typedChar == null) { // 處理退格 Backspace
+                    if (charIndex > 0) {
+                        charIndex--;
+                        if (characters[charIndex].classList.contains("incorrect")) {
+                            mistakes--;
+                        }
+                        characters[charIndex].classList.remove("correct", "incorrect");
+                    }
+                } else {
+                    if (characters[charIndex].innerText === typedChar) {
+                        characters[charIndex].classList.add("correct");
+                    } else {
+                        mistakes++;
+                        characters[charIndex].classList.add("incorrect");
+                    }
+                    charIndex++;
+                }
+
+                // 更新游標位置
+                characters.forEach(span => span.classList.remove("current"));
+                if(charIndex < characters.length) characters[charIndex].classList.add("current");
+
+                // 計算數據
+                let wpm = Math.round(((charIndex - mistakes) / 5) / ((maxTime - timeLeft) / 60));
+                wpm = wpm < 0 || !wpm || wpm === Infinity ? 0 : wpm;
+                
+                let acc = Math.round(((charIndex - mistakes) / charIndex) * 100);
+                
+                wpmTag.innerText = wpm;
+                accTag.innerText = charIndex > 0 ? acc : 100;
+
+                // 若句子打完，換下一句
+                if(charIndex === characters.length) {
+                    quoteInput.value = "";
+                    charIndex = 0;
+                    loadQuote();
+                }
+            } else {
+                clearInterval(timer);
+                quoteInput.value = "";
+            }
+        }
+
+        function initTimer() {
+            if (timeLeft > 0) {
+                timeLeft--;
+                timerTag.innerText = timeLeft;
+            } else {
+                clearInterval(timer);
+                quoteInput.disabled = true;
+                alert("時間到！你的最終速度是 " + wpmTag.innerText + " WPM");
+            }
+        }
+
+        function resetGame() {
+            loadQuote();
+            clearInterval(timer);
+            timeLeft = maxTime;
+            charIndex = mistakes = isTyping = 0;
+            quoteInput.value = "";
+            quoteInput.disabled = false;
+            timerTag.innerText = timeLeft;
+            wpmTag.innerText = 0;
+            accTag.innerText = 100;
+        }
+
+        loadQuote();
+        quoteInput.addEventListener("input", initTyping);
+        restartBtn.addEventListener("click", resetGame);
+    </script>
+</body>
+</html>
